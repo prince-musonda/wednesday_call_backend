@@ -1,0 +1,32 @@
+{
+    "name": "@amazon/nova-sonic-twilio-integration",
+    "version": "1.0.0",
+    "description": "",
+    "type": "commonjs",
+    "scripts": {
+        "build": "tsc",
+        "start": "node dist/server.js",
+        "cli": "ts-node src/index-cli.ts",
+        "dev": "ts-node src/server.ts"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "dependencies": {
+        "@aws-sdk/client-bedrock-agent-runtime": "^3.782",
+        "@aws-sdk/client-bedrock-runtime": "^3.785",
+        "@aws-sdk/credential-providers": "^3.782",
+        "@fastify/formbody": "^8.0.2",
+        "@fastify/websocket": "^11.0.2",
+        "@smithy/node-http-handler": "^4.0.4",
+        "@smithy/types": "^4.1.0",
+        "alawmulaw": "6.0.0",
+        "fastify": "^5.3.2",
+        "rxjs": "7.8.2",
+        "twilio": "5.5.2"
+    },
+    "devDependencies": {
+        "@types/node": "^25.9.3",
+        "typescript": "5.8.2"
+    }
+}
