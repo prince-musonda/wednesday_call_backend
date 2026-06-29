@@ -107,6 +107,10 @@ import {
         }
       }
     }
+    public setToolProcessor(fn: (toolName: string, toolArgs: string) => Promise<object>): void {
+      this.client.setSessionToolProcessor(this.sessionId, fn);
+    }
+
     // Get session ID
     public getSessionId(): string {
       return this.sessionId;
@@ -149,6 +153,7 @@ import {
     isPromptStartSent: boolean;
     isAudioContentStartSent: boolean;
     audioContentId: string;
+    sessionToolProcessor?: (toolName: string, toolArgs: string) => Promise<object>;
   }
   
   export class S2SBidirectionalStreamClient {
@@ -186,6 +191,11 @@ import {
       };
     }
   
+    public setSessionToolProcessor(sessionId: string, fn: (toolName: string, toolArgs: string) => Promise<object>): void {
+      const session = this.activeSessions.get(sessionId);
+      if (session) session.sessionToolProcessor = fn;
+    }
+
     public isSessionActive(sessionId: string): boolean {
       const session = this.activeSessions.get(sessionId);
       return !!session && session.isActive;
@@ -446,9 +456,8 @@ import {
                   });
   
                   console.log("calling tooluse");
-                  // Call external model
-                  //const externalModelResult = await this.processToolUse(session.toolName, session.toolUseContent);
-                  const externalModelResult = await toolProcessor(session.toolName.toLowerCase(), session.toolUseContent.content);
+                  const processor = session.sessionToolProcessor ?? toolProcessor;
+                  const externalModelResult = await processor(session.toolName.toLowerCase(), session.toolUseContent.content);
   
                   // Send tool result
                   this.sendToolResult(sessionId, session.toolUseId, externalModelResult);

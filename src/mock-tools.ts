@@ -111,6 +111,10 @@ const saveSummarySchema = JSON.stringify({
 });
 
 async function saveSummary({ orgId, summary }: { orgId: string; summary: string }) {
+    if (!orgId) {
+        console.error('saveSummary: orgId is missing — summary not saved');
+        return { success: false, reason: 'orgId is required' };
+    }
     const endpoint = process.env.SUMMARY_ENDPOINT;
     if (!endpoint) {
         console.warn('SUMMARY_ENDPOINT env var not set — summary not saved');

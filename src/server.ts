@@ -129,6 +129,12 @@ fastify.register(async (fastify) => {
     const orgId = query.orgId || "";
     const orgName = query.orgName || "the organisation";
 
+    session.setToolProcessor(async (toolName, toolArgs) => {
+      const args = JSON.parse(toolArgs);
+      if (orgId && !args.orgId) args.orgId = orgId;
+      return toolProcessor(toolName, JSON.stringify(args));
+    });
+
     let callSid = "";
     let summarySaved = false;
     const transcriptLines: string[] = [];
