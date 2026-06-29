@@ -3,7 +3,7 @@ import Fastify from "fastify";
 import fastifyFormBody from "@fastify/formbody";
 import fastifyWs from "@fastify/websocket";
 import { randomUUID } from "node:crypto";
-import { fromNodeProviderChain } from "@aws-sdk/credential-providers";
+import { fromEnv } from "@aws-sdk/credential-providers";
 import { S2SBidirectionalStreamClient, StreamSession } from "./nova-client";
 import { mulaw } from "alawmulaw";
 import { Twilio } from "twilio";
@@ -45,11 +45,7 @@ const bedrockClient = new S2SBidirectionalStreamClient({
   },
   clientConfig: {
     region: process.env.AWS_REGION || "us-east-1",
-    // In production set AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY env vars.
-    // Locally, set AWS_PROFILE to use a named profile from ~/.aws/credentials.
-    credentials: fromNodeProviderChain({
-      profile: process.env.AWS_PROFILE ?? "bedrock-test",
-    }),
+    credentials: fromEnv(),
   },
 });
 
