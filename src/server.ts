@@ -80,7 +80,7 @@ fastify.all("/outbound-call", async (request, reply) => {
 
   const params = new URLSearchParams({ orgId, orgName });
   const wssBase = process.env.WSS_BASE_URL || `wss://${request.headers.host}`;
-  const streamUrl = `${wssBase}/media-stream?${params.toString()}`;
+  const streamUrl = `${wssBase}/media-stream?${params.toString().replace(/&/g, '&amp;')}`;
 
   const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
                           <Response>
