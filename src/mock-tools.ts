@@ -68,16 +68,21 @@ async function queryKnowledgeBase({ orgId, query }: { orgId: string; query: stri
         return { result: 'Knowledge base is not available at the moment.' };
     }
     try {
-        const response = await fetch(`${endpoint}/query`, {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 8000);
+        const response = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ org_id: orgId, query })
+            body: JSON.stringify({ org_id: orgId, query }),
+            signal: controller.signal,
         });
+        clearTimeout(timeout);
         const data = await response.json() as { result?: string };
         return { result: data.result || 'No relevant information found.' };
-    } catch (error) {
-        console.error('Knowledge base query failed:', error);
-        return { result: 'Unable to retrieve information at this time.' };
+    } catch (error: any) {
+        const reason = error?.name === 'AbortError' ? 'timeout' : error;
+        console.error('Knowledge base query failed:', reason);
+        return { result: 'I could not retrieve that information right now. Please try again in a moment.' };
     }
 }
 
