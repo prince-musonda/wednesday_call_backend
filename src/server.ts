@@ -5,6 +5,7 @@ import fastifyWs from "@fastify/websocket";
 import { randomUUID } from "node:crypto";
 import { fromEnv } from "@aws-sdk/credential-providers";
 import { S2SBidirectionalStreamClient, StreamSession } from "./nova-client";
+import { toolProcessor } from "./mock-tools";
 import { mulaw } from "alawmulaw";
 import { Twilio } from "twilio";
 import { readFileSync } from "node:fs";
@@ -129,6 +130,9 @@ fastify.register(async (fastify) => {
     const orgName = query.orgName || "the organisation";
 
     let callSid = "";
+    let summarySaved = false;
+    const transcriptLines: string[] = [];
+
     // Handle incoming messages from Twilio
     connection.on("message", async (message: string) => {
       try {
@@ -175,8 +179,17 @@ fastify.register(async (fastify) => {
     });
 
     // Handle connection close
-    connection.on("close", () => {
+    connection.on("close", async () => {
       console.log("Client disconnected.");
+      if (!summarySaved && transcriptLines.length > 0 && orgId) {
+        const summary = `Call transcript (auto-saved on disconnect):\n${transcriptLines.join("\n")}`;
+        try {
+          await toolProcessor("savesummary", JSON.stringify({ orgId, summary }));
+          console.log("Fallback summary saved on disconnect.");
+        } catch (e) {
+          console.error("Failed to save fallback summary:", e);
+        }
+      }
     });
 
     /**
@@ -191,7 +204,7 @@ fastify.register(async (fastify) => {
 
     session.onEvent("textOutput", (data) => {
       console.log("Text output:", data.content.substring(0, 50) + "...");
-      //socket.emit('textOutput', data);
+      if (data.content) transcriptLines.push(`Assistant: ${data.content}`);
     });
 
     session.onEvent("audioOutput", (data) => {
@@ -233,6 +246,9 @@ fastify.register(async (fastify) => {
 
     session.onEvent("toolUse", (data) => {
       console.log("Tool use detected:", data.toolName);
+      if (data.toolName?.toLowerCase() === "savesummary") {
+        summarySaved = true;
+      }
     });
 
     session.onEvent("toolResult", () => {
