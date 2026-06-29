@@ -79,7 +79,8 @@ fastify.all("/outbound-call", async (request, reply) => {
   }
 
   const params = new URLSearchParams({ orgId, orgName });
-  const streamUrl = `wss://${request.headers.host}/media-stream?${params.toString()}`;
+  const wssBase = process.env.WSS_BASE_URL || `wss://${request.headers.host}`;
+  const streamUrl = `${wssBase}/media-stream?${params.toString()}`;
 
   const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
                           <Response>
@@ -107,7 +108,7 @@ fastify.all("/incoming-call", async (_request, reply) => {
   const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
                           <Response>
                               <Say language="en-US" voice="Polly.Matthew-Generative">
-                                  Hello stranger! Thank you for calling Wednesday. However, direct calls are not supported. Please open the Wednesday app,
+                                  Hello there! Thank you for calling Wednesday. However, direct calls are not supported. Please open the Wednesday app,
                                   select the organisation you would like to speak with,
                                   and request a call. We will call you back within seconds. Goodbye.
                               </Say>
