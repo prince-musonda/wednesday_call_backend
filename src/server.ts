@@ -181,10 +181,12 @@ fastify.register(async (fastify) => {
     // Handle connection close
     connection.on("close", async () => {
       console.log("Client disconnected.");
-      if (!summarySaved && transcriptLines.length > 0 && orgId) {
-        const summary = `Call transcript (auto-saved on disconnect):\n${transcriptLines.join("\n")}`;
+      if (!summarySaved && orgId) {
+        const body = transcriptLines.length > 0
+          ? `Call transcript (auto-saved on disconnect):\n${transcriptLines.join("\n")}`
+          : `A call was completed for this organisation. No transcript was captured.`;
         try {
-          await toolProcessor("savesummary", JSON.stringify({ orgId, summary }));
+          await toolProcessor("savesummary", JSON.stringify({ orgId, summary: body }));
           console.log("Fallback summary saved on disconnect.");
         } catch (e) {
           console.error("Failed to save fallback summary:", e);
