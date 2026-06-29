@@ -69,7 +69,7 @@ async function queryKnowledgeBase({ orgId, query }: { orgId: string; query: stri
     }
     try {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 8000);
+        const timeout = setTimeout(() => controller.abort(), 10000);
         const response = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
