@@ -71,7 +71,7 @@ async function queryKnowledgeBase({ orgId, query }: { orgId: string; query: stri
         const response = await fetch(`${endpoint}/query`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ orgId, query })
+            body: JSON.stringify({ org_id: orgId, query })
         });
         const data = await response.json() as { result?: string };
         return { result: data.result || 'No relevant information found.' };
@@ -111,11 +111,14 @@ async function saveSummary({ orgId, summary }: { orgId: string; summary: string 
         console.warn('SUMMARY_ENDPOINT env var not set — summary not saved');
         return { success: false, reason: 'SUMMARY_ENDPOINT not configured' };
     }
+    const apiKey = process.env.SERVICE_API_KEY;
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (apiKey) headers['x-api-key'] = apiKey;
     try {
         const response = await fetch(endpoint, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ orgId, summary, timestamp: new Date().toISOString() })
+            headers,
+            body: JSON.stringify({ org_id: orgId, content: summary, type: 'call' })
         });
         console.log(`Summary saved for org ${orgId}, status: ${response.status}`);
         return { success: response.ok };

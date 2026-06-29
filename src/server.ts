@@ -1,11 +1,12 @@
+import 'dotenv/config';
 import Fastify from 'fastify';
 import fastifyFormBody from '@fastify/formbody';
 import fastifyWs from '@fastify/websocket';
 import { randomUUID } from "node:crypto";
-import { fromIni } from "@aws-sdk/credential-providers";
+import { fromNodeProviderChain } from "@aws-sdk/credential-providers";
 import { S2SBidirectionalStreamClient, StreamSession } from './nova-client';
 import {mulaw} from 'alawmulaw';
-import { Twilio, twiml } from "twilio"
+import { Twilio } from "twilio"
 import { readFileSync } from 'node:fs';
 
 //read the audio bytes from hello.pcm file
@@ -17,10 +18,8 @@ const helloAudioBytes = readFileSync('assets/hello.pcm');
 const apiSid = process.env.TWILIO_API_SID;
 const apiSecret = process.env.TWILIO_API_SECRET;
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
-const sipEndpoint = process.env.SIP_ENDPOINT;
 
 const fromNumber = process.env.TWILIO_FROM_NUMBER;
-const toNumber = process.env.TWILIO_VERIFIED_CALLER_ID;
 
 const twClient = new Twilio(apiSid, apiSecret, {accountSid});
 
@@ -40,9 +39,6 @@ function buildSystemPrompt(orgName: string, orgId: string): string {
   );
 }
 
-// Configure AWS credentials
-const AWS_PROFILE_NAME = process.env.AWS_PROFILE ?? 'bedrock-test';
-
 // Create the AWS Bedrock client
 const bedrockClient = new S2SBidirectionalStreamClient({
     requestHandlerConfig: {
@@ -50,22 +46,16 @@ const bedrockClient = new S2SBidirectionalStreamClient({
     },
     clientConfig: {
         region: process.env.AWS_REGION || "us-east-1",
-        credentials: fromIni({ profile: AWS_PROFILE_NAME })
+        // In production set AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY env vars.
+        // Locally, set AWS_PROFILE to use a named profile from ~/.aws/credentials.
+        credentials: fromNodeProviderChain({
+            profile: process.env.AWS_PROFILE ?? 'bedrock-test'
+        })
     }
 });
 
 
 const sessionMap = {};
-
-const sipTwiml = `
-<Response>
-    <Say>Hang on for a moment while I forward the call to an agent</Say>
-    <Pause length="1"/>
-    <Dial>
-    <Sip>${sipEndpoint}</Sip>
-</Dial>
-</Response>
-`;
 
 // Initialize Fastify
 const fastify = Fastify();
@@ -73,7 +63,7 @@ fastify.register(fastifyFormBody);
 fastify.register(fastifyWs);
 
 // Root Route
-fastify.get('/', async (request, reply) => {
+fastify.get('/', async (_request, reply) => {
     reply.send({ message: 'Twilio Media Stream Server is running!' });
 });
 
@@ -84,9 +74,9 @@ fastify.all('/outbound-call', async (request, reply) => {
     const query = request.query as Record<string, string>;
     const orgId = query.orgId || '';
     const orgName = query.orgName || '';
-    const callTo = query.to || toNumber;
+    const callTo = query.to;
 
-    if (!orgId || !orgName) {
+    if (!orgId || !orgName || !callTo) {
         reply.status(400).send({ error: 'orgId and orgName are required' });
         return;
     }
@@ -115,7 +105,7 @@ fastify.all('/outbound-call', async (request, reply) => {
 
 
 // Direct inbound calls are not supported — users must request a call through the Wednesday app.
-fastify.all('/incoming-call', async (request, reply) => {
+fastify.all('/incoming-call', async (_request, reply) => {
     const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
                           <Response>
                               <Say language="en-US" voice="Polly.Matthew-Generative">
@@ -128,13 +118,6 @@ fastify.all('/incoming-call', async (request, reply) => {
     reply.type('text/xml').send(twimlResponse);
 });
 
-
-// Route for Twilio to handle incoming and outgoing calls
-// <Say> punctuation to improve text-to-speech translation
-fastify.all('/failover', async (request, reply) => {
-
-    reply.type('text/xml').send(sipTwiml);
-});
 
 
 // WebSocket route for media-stream
@@ -154,7 +137,7 @@ fastify.register(async (fastify) => {
 
         let callSid = '';
         // Handle incoming messages from Twilio
-        connection.on('message', async (message) => {
+        connection.on('message', async (message: string) => {
 
             try {
                 const data = JSON.parse(message);
@@ -252,23 +235,12 @@ fastify.register(async (fastify) => {
             //optionally close the connection based on the error            
         });
 
-        session.onEvent('toolUse', async (data) => {
+        session.onEvent('toolUse', (data) => {
             console.log('Tool use detected:', data.toolName);
-            if (data.toolName == 'support') {      
-                console.log(`Transfering call id ${callSid}`);
-                try {
-                    await twClient.calls(callSid).update({twiml: sipTwiml});    
-                } catch (error) {
-                    console.log(error);
-                }          
-                
-            }
-            //socket.emit('toolUse', data);
         });
 
-        session.onEvent('toolResult', (data) => {
+        session.onEvent('toolResult', () => {
             console.log('Tool result received');
-            //socket.emit('toolResult', data);
         });
 
         session.onEvent('contentEnd', (data) => {
