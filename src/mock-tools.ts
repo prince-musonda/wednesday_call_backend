@@ -90,11 +90,14 @@ async function queryKnowledgeBase({
       signal: controller.signal,
     });
     clearTimeout(timeout);
-    const data = (await response.json()) as { result?: string };
+    const data = await response.json();
     console.log(
-      `##############################################results from knowledge base: {data.result}`,
+      `########################################[RAG] response:`,
+      JSON.stringify(data),
     );
-    return { result: data.result || "No relevant information found." };
+    const result =
+      data?.result ?? data?.answer ?? data?.text ?? data?.content ?? data?.data;
+    return { result: result || "No relevant information found." };
   } catch (error: any) {
     const reason = error?.name === "AbortError" ? "timeout" : error;
     console.error("Knowledge base query failed:", reason);
