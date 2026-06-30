@@ -75,16 +75,18 @@ fastify.all("/outbound-call", async (request, reply) => {
     return;
   }
 
-  const params = new URLSearchParams({ orgId, orgName });
   const wssBase = process.env.WSS_BASE_URL || `wss://${request.headers.host}`;
-  const streamUrl = `${wssBase}/media-stream?${params.toString().replace(/&/g, '&amp;')}`;
+  const streamUrl = `${wssBase}/media-stream`;
 
   const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
                           <Response>
                               <Say language="en-US" voice="Polly.Matthew-Generative">Please wait while we connect you to the ${orgName} assistant.</Say>
                               <Pause length="1"/>
                               <Connect>
-                                <Stream url="${streamUrl}" />
+                                <Stream url="${streamUrl}">
+                                  <Parameter name="orgId" value="${orgId}" />
+                                  <Parameter name="orgName" value="${orgName}" />
+                                </Stream>
                               </Connect>
                           </Response>`;
 
@@ -125,13 +127,11 @@ fastify.register(async (fastify) => {
     sessionMap[sessionId] = session; //store the session in the map
     bedrockClient.initiateSession(sessionId); //initiate the session
 
-    const query = req.query as Record<string, string>;
-    const orgId = query.orgId || "";
-    const orgName = query.orgName || "the organisation";
+    const ctx = { orgId: "", orgName: "the organisation" };
 
     session.setToolProcessor(async (toolName, toolArgs) => {
       const args = JSON.parse(toolArgs);
-      if (orgId && !args.orgId) args.orgId = orgId;
+      if (ctx.orgId && !args.orgId) args.orgId = ctx.orgId;
       return toolProcessor(toolName, JSON.stringify(args));
     });
 
@@ -150,14 +150,18 @@ fastify.register(async (fastify) => {
             await session.setupPromptStart();
             break;
           case "start": {
-            const systemPrompt = buildSystemPrompt(orgName, orgId);
+            const customParams = data.start.customParameters || {};
+            ctx.orgId = customParams.orgId || "";
+            ctx.orgName = customParams.orgName || "the organisation";
+
+            const systemPrompt = buildSystemPrompt(ctx.orgName, ctx.orgId);
             await session.setupSystemPrompt(undefined, systemPrompt);
             await session.setupStartAudio();
 
             session.streamSid = data.streamSid;
-            callSid = data.start.callSid; //call sid to update while redirecting it to SIP endpoint
+            callSid = data.start.callSid;
             console.log(
-              `Stream started streamSid: ${session.streamSid}, callSid: ${callSid}`,
+              `Stream started streamSid: ${session.streamSid}, callSid: ${callSid}, orgId: ${ctx.orgId}`,
             );
 
             //send the audio bytes that say "hello" as to mimick the user greeting to allow model to speak first
@@ -187,12 +191,12 @@ fastify.register(async (fastify) => {
     // Handle connection close
     connection.on("close", async () => {
       console.log("Client disconnected.");
-      if (!summarySaved && orgId) {
+      if (!summarySaved && ctx.orgId) {
         const body = transcriptLines.length > 0
           ? `Call transcript (auto-saved on disconnect):\n${transcriptLines.join("\n")}`
           : `A call was completed for this organisation. No transcript was captured.`;
         try {
-          await toolProcessor("savesummary", JSON.stringify({ orgId, summary: body }));
+          await toolProcessor("savesummary", JSON.stringify({ orgId: ctx.orgId, summary: body }));
           console.log("Fallback summary saved on disconnect.");
         } catch (e) {
           console.error("Failed to save fallback summary:", e);
