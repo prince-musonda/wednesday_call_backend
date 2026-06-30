@@ -200,11 +200,11 @@ async function toolProcessor(
 
   if (toolName in toolHandlers) {
     const tool = toolHandlers[toolName];
-    if (tool.constructor.name === "AsyncFunction") {
-      return await tool(args);
-    } else {
-      return tool(args);
-    }
+    const result = tool.constructor.name === "AsyncFunction"
+      ? await tool(args)
+      : tool(args);
+    console.log(`Tool ${toolName} result:`, JSON.stringify(result).substring(0, 300));
+    return result;
   } else {
     console.log(`Tool ${toolName} not supported`);
     return { message: "I cannot help you with that request", success: false };

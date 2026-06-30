@@ -263,8 +263,9 @@ fastify.register(async (fastify) => {
       }
     });
 
-    session.onEvent("toolResult", () => {
-      console.log("Tool result received");
+    session.onEvent("toolResult", (data) => {
+      const preview = JSON.stringify(data?.result).substring(0, 300);
+      console.log("Tool result sent to model:", preview);
     });
 
     session.onEvent("contentEnd", (data) => {
